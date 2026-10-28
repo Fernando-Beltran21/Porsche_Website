@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Porsche 911 Carrera S — Especificaciones & Configurador</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Tipografía estilo Porsche (Porsche Next / Michroma + Space Grotesk) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Sketchfab Viewer API -->
+    <script type="text/javascript" src="https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js"></script>
+
+    <style>
+        @font-face {
+            font-family: 'PorscheNext';
+            src: local('Porsche Next'), local('PorscheNext-Regular'), local('Michroma');
+            font-display: swap;
+        }
+
+        :root {
+            --font-porsche-title: 'PorscheNext', 'Michroma', sans-serif;
+            --font-porsche-body: 'PorscheNext', 'Space Grotesk', sans-serif;
+            --text-color: #F5F5F7;
+            --muted-color: rgba(245, 245, 247, 0.72);
+            --border-color: rgba(245, 245, 247, 0.22);
+            --surface-color: rgba(10, 10, 12, 0.84);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            border-radius: 0 !important; /* Estética 100% cuadrada/rectangular minimalista */
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: var(--font-porsche-body);
+            /* Fondo estático negro arriba con degradado blanco hacia abajo */
+            background: linear-gradient(180deg, #000000 0%, #0b0b0d 44%, #dcdce0 86%, #ffffff 100%);
+            color: var(--text-color);
+            letter-spacing: 0.02em;
+        }
+
+        /* Tipografía Porsche aplicada a títulos y encabezados */
+        .font-porsche {
+            font-family: var(--font-porsche-title);
+            letter-spacing: 0.06em;
+        }
+
+        /* Lienzo Three.js minimalista y optimizado (solo sombra de piso a 60fps) */
+        #webgl-container {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* Contenedor del Porsche 911 3D: bloqueado a clics para moverse SOLO con scroll */
+        #sketchfab-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 5;
+            pointer-events: none !important;
+            overflow: hidden;
+        }
+
+        /* Recorte sutil de bordes del iframe para ocultar cualquier control residual (VR, Inspector, Fullscreen) */
+        #sketchfab-frame {
+            position: absolute;
+            top: -54px;
+            left: -54px;
+            width: calc(100% + 108px);
+            height: calc(100% + 108px);
+            border: 0;
+            background: transparent;
+            pointer-events: none !important;
+        }
+
+        /* Capa de partículas de túnel de viento frontal sobre el Porsche 911 */
+        #aero-particles-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 7;
+            pointer-events: none !important;
+        }
+
+        /* Capa de interfaz informativa */
+        .ui-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .interactive {
+            pointer-events: auto;
+        }
+
+        .solid-surface {
+            background-color: var(--surface-color);
+        }
+
+        .solid-border {
+            border-color: var(--border-color);
+        }
+
+        .text-muted-adaptive {
+            color: var(--muted-color);
+        }
+
+        /* Contenedor de capítulos con subida progresiva optimizada por GPU */
+        .chapters-viewport {
+            position: relative;
+            width: 100%;
+            height: 500px;
+        }
+
+        .chapter-slide {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            will-change: transform, opacity;
+            pointer-events: none;
+        }
+
+        .chapter-slide.is-active {
+            pointer-events: auto;
+        }
+
+        .scroll-rise-item {
+            will-change: transform;
+        }
+
+        /* Botones de navegación rectangulares */
+        .nav-rect {
+            transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+        }
+        .nav-rect.active {
+            background-color: #D5001C;
+            color: #FFFFFF;
+            border-color: #D5001C;
+        }
+
+        /* Botones de perspectiva de la sección aerodinámica */
+        .aero-view-btn {
+            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+        .aero-view-btn.active {
+            background-color: #D5001C;
+            color: #FFFFFF;
+            border-color: #D5001C;
+        }
+
+        /* Cuadros cuadrados del configurador de pintura Porsche */
+        .porsche-swatch {
+            position: relative;
+            width: 34px;
+            height: 34px;
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            cursor: pointer;
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+        .porsche-swatch:hover {
+            transform: scale(1.06);
+            border-color: #ffffff;
+        }
+        .porsche-swatch.active {
+            border: 2px solid #ffffff;
+            outline: 2px solid #D5001C;
+            outline-offset: 2px;
+        }
+
+        /* Botones rectangulares de perspectiva de cámara en el configurador */
+        .perspective-btn {
+            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+        .perspective-btn.active {
+            background-color: #D5001C;
+            color: #FFFFFF;
+            border-color: #D5001C;
+        }
+
+        #loader-screen {
+            transition: opacity 0.45s ease;
+        }
+    </style>
+
+    <!-- Importmap oficial ligero de Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <!-- PANTALLA DE CARGA MINIMALISTA RECTANGULAR -->
+    <div id="loader-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#050507] text-[#F5F5F7] px-6">
+        <div class="w-full max-w-lg border border-white/20 bg-[#0A0A0D] p-8 space-y-6">
+            <div class="flex items-center justify-between border-b border-white/15 pb-4">
+                <div class="flex items-center gap-3">
+                    <span class="inline-block w-3 h-3 bg-[#D5001C]"></span>
+                    <span class="font-porsche text-xs tracking-widest uppercase">PORSCHE AG</span>
+                </div>
+                <span id="loader-percent" class="text-xs tracking-widest text-white/60">CARGANDO 3D</span>
+            </div>
+
+            <div class="space-y-2">
+                <h1 class="font-porsche text-2xl sm:text-3xl tracking-wider uppercase">911 CARRERA S</h1>
+                <p id="loader-status" class="text-xs text-white/50 uppercase tracking-widest">
+                    Preparando ficha técnica interactiva...
+                </p>
+            </div>
+
+            <div class="w-full h-1 bg-white/10 overflow-hidden">
+                <div id="loader-bar" class="h-full bg-[#D5001C] w-1/2 transition-all duration-300"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LIENZO THREE.JS LIGERO (60 FPS) -->
+    <div id="webgl-container"></div>
+
+    <!-- MODELO 3D PORSCHE 911 (SIN CLICS NI CONTROLES EXTERNOS, SOLO SCROLL) -->
+    <div id="sketchfab-layer">
+        <iframe
+            id="sketchfab-frame"
+            title="Porsche 911 with interior"
+            allow="autoplay; xr-spatial-tracking"
+            xr-spatial-tracking
+            execution-while-out-of-viewport
+            execution-while-not-rendered>
+        </iframe>
+    </div>
+
+    <!-- CAPA DE PARTÍCULAS AERODINÁMICAS QUE INTERACTÚAN CON EL CARRO -->
+    <div id="aero-particles-layer"></div>
+
+    <!-- CAPA DE INTERFAZ INFORMATIVA CON FIGURAS CUADRADAS Y RECTANGULARES -->
+    <div class="ui-layer p-5 sm:p-8 lg:p-10">
+
+        <!-- CABECERA SUPERIOR RECTANGULAR -->
+        <header class="w-full flex flex-wrap items-center justify-between gap-4">
+            <div class="interactive flex items-center">
+                <button id="btn-home" class="flex items-center gap-3 px-5 py-3 border solid-border solid-surface hover:bg-white/10 transition-colors">
+                    <span class="w-3 h-3 bg-[#D5001C]"></span>
+                    <span class="font-porsche text-xs sm:text-sm tracking-[0.2em] uppercase">PORSCHE</span>
+                </button>
+                <div class="hidden md:flex items-center px-4 py-3 border-y border-r solid-border solid-surface text-[11px] uppercase tracking-[0.18em] text-muted-adaptive">
+                    <span>911 CARRERA S (992) — FICHA TÉCNICA OFICIAL</span>
+                </div>
+            </div>
+
+            <!-- Indicador de estado informativo cuadrado -->
+            <div class="interactive flex items-center">
+                <div class="px-4 py-3 border solid-border solid-surface text-[11px] uppercase tracking-[0.16em] flex items-center gap-3">
+                    <span class="w-2 h-2 bg-[#D5001C]"></span>
+                    <span>CONTROL POR SCROLL ACTIVO</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- CONTENIDO INFORMATIVO CENTRAL CON TRANSICIÓN ASCENDENTE -->
+        <main class="w-full my-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            <div class="lg:col-span-5">
+                <div class="chapters-viewport">
+
+                    <!-- CAPÍTULO 01: ARQUITECTURA 911 -->
+                    <section id="chapter-0" class="chapter-slide is-active space-y-4">
+                        <div class="scroll-rise-item inline-flex items-center gap-3 px-3.5 py-1.5 border solid-border solid-surface text-[10px] uppercase tracking-[0.22em]">
+                            <span class="text-[#D5001C] font-bold">01 / 05</span>
+                            <span>CONCEPTO &amp; LEGADO</span>
+                        </div>
+                        <h2 class="scroll-rise-item font-porsche text-2xl sm:text-4xl uppercase leading-tight">
+                            911 CARRERA S
+                        </h2>
+                        <p class="scroll-rise-item text-xs sm:text-sm text-muted-adaptive max-w-md leading-relaxed">
+                            Desde 1963, el Porsche 911 representa la referencia de los deportivos de motor trasero. Su carrocería en construcción ligera de aluminio y acero combina rigidez torsional con proporciones atemporales.
+                        </p>
+                        <div class="scroll-rise-item grid grid-cols-2 gap-0 max-w-md border solid-border solid-surface">
+                            <div class="p-3.5 border-r solid-border">
+                                <span class="text-[10px] uppercase tracking-widest text-muted-adaptive block">Tracción</span>
+                                <span class="font-porsche text-sm sm:text-base mt-1 block">Trasera (RWD)</span>
+                            </div>
+                            <div class="p-3.5">
+                                <span class="text-[10px] uppercase tracking-widest text-muted-adaptive block">Peso en vacío DIN</span>
+                                <span class="font-porsche text-sm sm:text-base mt-1 block">1,515 kg</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CAPÍTULO 02: DIMENSIONES Y AERODINÁMICA -->
+                    <section id="chapter-1" class="chapter-slide space-y-4">
+                        <div class="scroll-rise-item inline-flex items-center gap-3 px-3.5 py-1.5 border solid-border solid-surface text-[10px] uppercase tracking-[0.22em]">
+                            <span class="text-[#D5001C] font-bold">02 / 05</span>
+                            <span>AERODINÁMICA ACTIVA</span>
+                        </div>
+                        <h2 class="scroll-rise-item font-porsche text-2xl sm:text-4xl uppercase leading-tight">
+                            SILUETA FLYLINE
+                        </h2>
+                        <p class="scroll-rise-item text-xs sm:text-sm text-muted-adaptive max-w-md leading-relaxed">
+                            El sistema Porsche Active Aerodynamics (PAA) integra tomas de aire delanteras con aletas móviles y un spoiler trasero variable que optimiza la carga aerodinámica a altas velocidades.
+                        </p>
+                        <div class="scroll-rise-item grid grid-cols-3 gap-0 max-w-md border solid-border solid-surface">
+                            <div class="p-3 border-r solid-border">
+                                <span class="text-[10px] uppercase tracking-widest text-muted-adaptive block">Longitud</span>
+                                <span class="font-porsche text-xs sm:text-sm mt-1 block">4,519 mm</span>
+                            </div>
+                            <div class="p-3 border-r solid-border">
+                                <span class="text-[10px] uppercase tracking-widest text-muted-adaptive block">Anchura</span>
+                                <span class="font-porsche text-xs sm:text-sm mt-1 block">1,852 mm</span>
+                            </div>
+                            <div class="p-3">
+                                <span class="text-[10px] uppercase tracking-widest text-muted-adaptive block">Coef. Cx</span>
+                                <span class="font-porsche text-xs sm:text-sm mt-1 block">0.29</span>
+                            </div>
+                        </div>
+
+                        <!-- Selector de ángulos para observar el túnel de viento -->
+                        <div class="scroll-rise-item space-y-1.5 max-w-md pt-1">
+                            <span class="text-[9px] uppercase tracking-[0.18em] text-muted-adaptive block">Perspectiva del Viento</span>
+                            <div class="grid grid-cols-3 gap-1.5">
+                                <button type="button" data-aero-view="threequarters" class="aero-view-btn active px-2.5 py-2 border solid-border solid-surface text-[10px] font-porsche uppercase tracking-wider text-center hover:border-white transition-colors">
+                                    3/4 Frontal
+                                </button>
+                                <button type="button" data-aero-view="front" class="aero-view-btn px-2.5 py-2 border solid-border solid-surface text-[10px] font-porsche uppercase tracking-wider text-center hover:border-white transition-colors">
+                                    Frontal
+                                </button>
+                                <button type="button" data-aero-view="side" class="aero-view-btn px-2.5 py-2 border solid-border solid-surface text-[10px] font-porsche uppercase tracking-wider text-center hover:border-white transition-colors">
+                                    Lateral
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CAPÍTULO 03: MOTOR BÓXER BITURBO -->
+                    <section id="chapter-2" class="chapter-slide space-y-4">
+                        <div class="scroll-rise-item inline-flex items-center gap-3 px-3.5 py-1.5 border solid-border solid-surface text-[10px] uppercase tracking-[0.22em]">
+                            <span class="text-[#D5001C] font-bold">03 / 05</span>
+                            <span>PROPULSIÓN TRASERA</span>
+                        </div>
+                        <h2 class="scroll-rise-item font-porsche text-2xl sm:text-4xl uppercase leading-tight">
+                            MOTOR BÓXER BITURBO
+                        </h2>
+                        <p class="scroll-rise-item text-xs sm:text-sm text-muted-adaptive max-w-md leading-relaxed">
+                            Seis cilindros horizontales opuestos de 3.0 litros con doble turbocompresor situado sobre el eje trasero. Entrega una respuesta inmediata hasta las 7,500 rpm con transmisión PDK de 8 velocidades.
+                        </p>
+                        <div class="scroll-rise-item grid grid-cols-3 gap-0 max-w-md border solid-border solid-surface">
+                            <div class="p-3 border-r solid-border">
+                                <span class="text-[10px] uppercase tracking-widest text-muted-adaptive block">Potencia</span>
+                                <span class="font-porsche text-xs sm:text-sm mt-1 block">450 CV (331 kW)</span>
+                            </div>
+                            <div class="p-3 border-r solid-border">
+                                <span class="text-[10px] uppercase tracking-widest text-muted-adaptive block">0–100 km/h</span>
+                                <span class="font-porsche text-xs sm:text-sm mt-1 block">3.5 s</span>
+                            </div>
+                            <div class="p-3">
+                                <span class="text-[10px] uppercase tracking-widest text-muted-adaptive block">Vel. Máx.</span>
+                                <span class="font-porsche text-xs sm:text-sm mt-1 block">308 km/h</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CAPÍTULO 04: INTERIOR Y PORSCHE ADVANCED COCKPIT -->
+                    <section id="chapter-3" class="chapter-slide space-y-4">
+                        <div class="scroll-rise-item inline-flex items-center gap-3 px-3.5 py-1.5 border solid-border solid-surface text-[10px] uppercase tracking-[0.22em]">
+                            <span class="text-[#D5001C] font-bold">04 / 05</span>
+                            <span>HABITÁCULO &amp; CHASIS</span>
+                        </div>
+                        <h2 class="scroll-rise-item font-porsche text-2xl sm:text-4xl uppercase leading-tight">
+                            ADVANCED COCKPIT
+                        </h2>
+                        <p class="scroll-rise-item text-xs sm:text-sm text-muted-adaptive max-w-md leading-relaxed">
+                            Arquitectura interior horizontal inspirada en los 911 de los años 70, con cuentarrevoluciones analógico central flanqueado por dos pantallas de 7 pulgadas y pantalla táctil PCM de 10.9 pulgadas.
+                        </p>
+                        <div class="scroll-rise-item grid grid-cols-2 gap-0 max-w-md border solid-border solid-surface">
+                            <div class="p-3.5 border-r solid-border">
+                                <span class="text-[10px] uppercase tracking-widest text-muted-adaptive block">Suspensión</span>
+                                <span class="font-porsche text-xs sm:text-sm mt-1 block">PASM Activa</span>
+                            </div>
+                            <div class="p-3.5">
+                                <span class="text-[10px] uppercase tracking-widest text-muted-adaptive block">Asientos</span>
+                                <span class="font-porsche text-xs sm:text-sm mt-1 block">Deportivos Plus 2+2</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CAPÍTULO 05: CONFIGURADOR REAL DE PINTURA PORSCHE -->
+                    <section id="chapter-4" class="chapter-slide space-y-3">
+                        <div class="scroll-rise-item inline-flex items-center gap-3 px-3.5 py-1.5 border solid-border solid-surface text-[10px] uppercase tracking-[0.22em]">
+                            <span class="text-[#D5001C] font-bold">05 / 05</span>
+                            <span>COLORES EXTERIORES PORSCHE</span>
+                        </div>
+                        <h2 class="scroll-rise-item font-porsche text-xl sm:text-3xl uppercase leading-tight">
+                            PINTURA EXTERIOR
+                        </h2>
+
+                        <!-- Panel cuadrado con la paleta oficial del Configurador Porsche -->
+                        <div class="scroll-rise-item p-4 border solid-border solid-surface max-w-md space-y-3">
+                            <div class="flex items-center justify-between border-b solid-border pb-2.5">
+                                <div>
+                                    <span id="active-color-category" class="text-[9px] uppercase tracking-[0.2em] text-muted-adaptive block">COLORES METALIZADOS</span>
+                                    <span id="active-color-name" class="font-porsche text-xs sm:text-sm uppercase mt-0.5 block">Blanco Carrara Metalizado</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span id="active-color-preview" class="w-6 h-6 border border-white/40 inline-block" style="background-color: #EAECEF;"></span>
+                                </div>
+                            </div>
+
+                            <!-- Colores Estándar -->
+                            <div class="space-y-1.5">
+                                <span class="text-[9px] uppercase tracking-[0.18em] text-muted-adaptive block">Estándar</span>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <button data-preset="#0D0D0F" data-category="COLORES ESTÁNDAR" data-name="Negro (Black)" class="porsche-swatch bg-[#0D0D0F]" title="Negro"></button>
+                                    <button data-preset="#F4F4F2" data-category="COLORES ESTÁNDAR" data-name="Blanco (White)" class="porsche-swatch bg-[#F4F4F2]" title="Blanco"></button>
+                                    <button data-preset="#CC0000" data-category="COLORES ESTÁNDAR" data-name="Rojo Guardia (Guards Red)" class="porsche-swatch bg-[#CC0000]" title="Rojo Guardia"></button>
+                                    <button data-preset="#FFD100" data-category="COLORES ESTÁNDAR" data-name="Amarillo Racing (Racing Yellow)" class="porsche-swatch bg-[#FFD100]" title="Amarillo Racing"></button>
+                                </div>
+                            </div>
+
+                            <!-- Colores Metalizados -->
+                            <div class="space-y-1.5">
+                                <span class="text-[9px] uppercase tracking-[0.18em] text-muted-adaptive block">Metalizados</span>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <button data-preset="#EAECEF" data-category="COLORES METALIZADOS" data-name="Blanco Carrara Metalizado" class="porsche-swatch active bg-[#EAECEF]" title="Blanco Carrara Metalizado"></button>
+                                    <button data-preset="#08090C" data-category="COLORES METALIZADOS" data-name="Negro Jet Metalizado" class="porsche-swatch bg-[#08090C]" title="Negro Jet Metalizado"></button>
+                                    <button data-preset="#5C5D60" data-category="COLORES METALIZADOS" data-name="Gris Ágata Metalizado (Agate Grey)" class="porsche-swatch bg-[#5C5D60]" title="Gris Ágata Metalizado"></button>
+                                    <button data-preset="#A5A9AE" data-category="COLORES METALIZADOS" data-name="Plata GT Metalizado (GT Silver)" class="porsche-swatch bg-[#A5A9AE]" title="Plata GT Metalizado"></button>
+                                    <button data-preset="#10214B" data-category="COLORES METALIZADOS" data-name="Azul Genciana Metalizado (Gentian Blue)" class="porsche-swatch bg-[#10214B]" title="Azul Genciana Metalizado"></button>
+                                    <button data-preset="#3C463E" data-category="COLORES METALIZADOS" data-name="Verde Aventurina Metalizado" class="porsche-swatch bg-[#3C463E]" title="Verde Aventurina Metalizado"></button>
+                                </div>
+                            </div>
+
+                            <!-- Colores Especiales / Leyenda -->
+                            <div class="space-y-1.5">
+                                <span class="text-[9px] uppercase tracking-[0.18em] text-muted-adaptive block">Especiales &amp; Paint to Sample</span>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <button data-preset="#CBC9C3" data-category="COLORES ESPECIALES" data-name="Crayón (Chalk)" class="porsche-swatch bg-[#CBC9C3]" title="Crayón"></button>
+                                    <button data-preset="#8E101B" data-category="COLORES ESPECIALES" data-name="Rojo Carmín (Carmine Red)" class="porsche-swatch bg-[#8E101B]" title="Rojo Carmín"></button>
+                                    <button data-preset="#0068B5" data-category="COLORES ESPECIALES" data-name="Azul Tiburón (Shark Blue)" class="porsche-swatch bg-[#0068B5]" title="Azul Tiburón"></button>
+                                    <button data-preset="#1C9C48" data-category="COLORES ESPECIALES" data-name="Verde Pitón (Python Green)" class="porsche-swatch bg-[#1C9C48]" title="Verde Pitón"></button>
+                                    <button data-preset="#D4622A" data-category="PAINT TO SAMPLE" data-name="Naranja Golfo (Gulf Orange)" class="porsche-swatch bg-[#D4622A]" title="Naranja Golfo"></button>
+                                </div>
+                            </div>
+
+                            <!-- Indicador de rotación automática hacia la derecha -->
+                            <div class="pt-2.5 border-t solid-border flex items-center justify-between">
+                                <span class="text-[9px] uppercase tracking-[0.18em] text-muted-adaptive block">Vista en Rotación</span>
+                                <span class="text-[9px] font-porsche uppercase tracking-wider text-white/80 flex items-center gap-2">
+                                    <span class="w-1.5 h-1.5 bg-[#D5001C] inline-block"></span>
+                                    GIRO CONTINUO 360° →
+                                </span>
+                            </div>
+                        </div>
+                    </section>
+
+                </div>
+            </div>
+
+            <!-- Espacio libre a la derecha para el Porsche 911 3D -->
+            <div class="lg:col-span-7"></div>
+        </main>
+
+        <!-- PIE DE PÁGINA RECTANGULAR -->
+        <footer class="w-full flex flex-col sm:flex-row items-center justify-between gap-4">
+            <nav class="interactive flex items-center border solid-border solid-surface overflow-x-auto max-w-full">
+                <button onclick="window.goToChapter(0)" data-nav="0" class="nav-rect active px-4 py-3 border-r solid-border text-[11px] font-porsche uppercase tracking-wider">
+                    01. Concepto
+                </button>
+                <button onclick="window.goToChapter(1)" data-nav="1" class="nav-rect px-4 py-3 border-r solid-border text-[11px] font-porsche uppercase tracking-wider">
+                    02. Aerodinámica
+                </button>
+                <button onclick="window.goToChapter(2)" data-nav="2" class="nav-rect px-4 py-3 border-r solid-border text-[11px] font-porsche uppercase tracking-wider">
+                    03. Motor Bóxer
+                </button>
+                <button onclick="window.goToChapter(3)" data-nav="3" class="nav-rect px-4 py-3 border-r solid-border text-[11px] font-porsche uppercase tracking-wider">
+                    04. Interior
+                </button>
+                <button onclick="window.goToChapter(4)" data-nav="4" class="nav-rect px-4 py-3 text-[11px] font-porsche uppercase tracking-wider">
+                    05. Pintura
+                </button>
+            </nav>
+
+            <div class="interactive flex items-center self-end sm:self-auto border solid-border solid-surface">
+                <button id="btn-prev" class="px-5 py-3 border-r solid-border text-[11px] font-porsche uppercase tracking-wider hover:bg-white/10 transition-colors">
+                    ← ANTERIOR
+                </button>
+                <button id="btn-next" class="px-5 py-3 bg-[#D5001C] text-white text-[11px] font-porsche uppercase tracking-wider hover:bg-[#b50017] transition-colors">
+                    SIGUIENTE →
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- LÓGICA OPTIMIZADA A 60 FPS: THREE.JS + SKETCHFAB VIEWER API -->
+    <script type="module">
+        import * as THREE from 'three';
+
+        const SKETCHFAB_MODEL_UID = '877b1bc1739f4a2bb65d62fd7ffd9f75';
+        const PORSCHE_ZOOM_SCALE = 0.19;
+
+        // Calcula un objetivo de cámara desplazado hacia la izquierda de la vista
+        // para que el Porsche 911 quede encuadrado a la derecha sin tapar el texto
+        function computeRightShiftedTarget(camPos, carCenter, rightShiftAmount) {
+            const dx = carCenter.x - camPos.x;
+            const dz = carCenter.z - camPos.z;
+            const len = Math.hypot(dx, dz) || 1;
+            const forwardX = dx / len;
+            const forwardZ = dz / len;
+            // Vector derecho de la cámara en el plano horizontal XZ
+            const rightX = -forwardZ;
+            const rightZ = forwardX;
+
+            return new THREE.Vector3(
+                carCenter.x - rightX * rightShiftAmount,
+                carCenter.y,
+                carCenter.z - rightZ * rightShiftAmount
+            );
+        }
+
+        const INITIAL_BODY_COLOR = '#EAECEF'; // Blanco Carrara Metalizado
+        const PAINT_ORBIT_RADIUS = 26.8;
+        const PAINT_ORBIT_HEIGHT = 5.4;
+        const PAINT_CAR_CENTER = new THREE.Vector3(0, 1.9, 0);
+        const PAINT_RIGHT_SHIFT = 8.8;
+        let paintOrbitAngle = Math.PI * 0.75; // Ángulo inicial 3/4
+
+        // Parámetros de túnel de viento (pocas partículas diminutas que interactúan con la silueta del Porsche 911)
+        const AERO_PARTICLE_COUNT = 210;
+        let aeroParticleMesh = null;
+        let aeroParticleMaterial = null;
+        const aeroDummy = new THREE.Object3D();
+        const aeroParticlesData = [];
+
+        // Ángulos predefinidos para la sección de Aerodinámica
+        // Sistema de coordenadas sincronizado con el modelo 3D:
+        // +Z = Frente del Porsche (capó/faros) | -Z = Parte trasera (spoiler/escapes)
+        // -X = Lateral derecho (puerta cerrada) | +X = Lateral izquierdo (puerta abierta)
+        const AERO_CAR_CENTER = new THREE.Vector3(0, 1.35, 0);
+        const AERO_RIGHT_SHIFT = 3.2;
+
+        const AERO_PRESET_VIEWS = {
+            threequarters: {
+                camPos: new THREE.Vector3(-19.5, 4.8, 21.5),
+                camTarget: computeRightShiftedTarget(
+                    new THREE.Vector3(-19.5, 4.8, 21.5),
+                    AERO_CAR_CENTER,
+                    AERO_RIGHT_SHIFT
+                )
+            },
+            front: {
+                camPos: new THREE.Vector3(0.0, 3.1, 25.0),
+                camTarget: computeRightShiftedTarget(
+                    new THREE.Vector3(0.0, 3.1, 25.0),
+                    AERO_CAR_CENTER,
+                    AERO_RIGHT_SHIFT
+                )
+            },
+            side: {
+                camPos: new THREE.Vector3(-26.5, 3.0, 0.0),
+                camTarget: computeRightShiftedTarget(
+                    new THREE.Vector3(-26.5, 3.0, 0.0),
+                    AERO_CAR_CENTER,
+                    AERO_RIGHT_SHIFT
+                )
+            }
+        };
+
+        function setAeroView(viewKey) {
+            const preset = AERO_PRESET_VIEWS[viewKey];
+            if (!preset) return;
+            CHAPTERS[1].camPos.copy(preset.camPos);
+            CHAPTERS[1].camTarget.copy(preset.camTarget);
+
+            document.querySelectorAll('.aero-view-btn').forEach((btn) => {
+                btn.classList.toggle('active', btn.getAttribute('data-aero-view') === viewKey);
+            });
+        }
+        window.setAeroView = setAeroView;
+
+        const CHAPTERS = [
+            {
+                id: 0,
+                // 01. Concepto: Perspectiva frontal-derecha con zoom hacia el capó delantero y escudo Porsche
+                camPos: new THREE.Vector3(-5.2, 3.1, 13.8),
+                camTarget: computeRightShiftedTarget(
+                    new THREE.Vector3(-5.2, 3.1, 13.8),
+                    new THREE.Vector3(0.0, 0.85, 3.2),
+                    2.2
+                )
+            },
+            {
+                id: 1,
+                // 02. Aerodinámica: Inicia en 3/4 Frontal mirando el flujo de viento de frente hacia atrás
+                camPos: new THREE.Vector3().copy(AERO_PRESET_VIEWS.threequarters.camPos),
+                camTarget: new THREE.Vector3().copy(AERO_PRESET_VIEWS.threequarters.camTarget)
+            },
+            {
+                id: 2,
+                // 03. Motor Bóxer: Perspectiva 3/4 trasera enfocando el capó del motor trasero, spoiler y escapes
+                camPos: new THREE.Vector3(-18.5, 5.2, -21.0),
+                camTarget: computeRightShiftedTarget(
+                    new THREE.Vector3(-18.5, 5.2, -21.0),
+                    new THREE.Vector3(0.0, 1.1, -1.2),
+                    3.0
+                )
+            },
+            {
+                id: 3,
+                // 04. Interior: Vista hacia el habitáculo a través de la puerta izquierda abierta (+X)
+                camPos: new THREE.Vector3(8.2, 4.9, -7.8),
+                camTarget: new THREE.Vector3(-0.4, 1.45, 1.2)
+            },
+            {
+                id: 4,
+                // 05. Pintura: Giro continuo 360°
+                camPos: new THREE.Vector3(
+                    Math.cos(paintOrbitAngle) * PAINT_ORBIT_RADIUS,
+                    PAINT_ORBIT_HEIGHT,
+                    Math.sin(paintOrbitAngle) * PAINT_ORBIT_RADIUS
+                ),
+                camTarget: new THREE.Vector3(0, 1.9, 0)
+            }
+        ];
+        CHAPTERS[4].camTarget.copy(
+            computeRightShiftedTarget(CHAPTERS[4].camPos, PAINT_CAR_CENTER, PAINT_RIGHT_SHIFT)
+        );
+
+        let camera, scene, renderer, groundShadowMesh;
+
+        let targetScrollProgress = 0;
+        let currentScrollProgress = 0;
+        let lastRenderedProgress = -1;
+        let lastActiveNavIndex = -1;
+
+        const currentCamPos = new THREE.Vector3().copy(CHAPTERS[0].camPos);
+        const currentCamTarget = new THREE.Vector3().copy(CHAPTERS[0].camTarget);
+        const desiredCamPos = new THREE.Vector3().copy(CHAPTERS[0].camPos);
+        const desiredCamTarget = new THREE.Vector3().copy(CHAPTERS[0].camTarget);
+
+        let sketchfabApi = null;
+        let sketchfabReady = false;
+        let modelCenter = [0, 0, 0];
+        let modelRadius = 2.5;
+        let lastCamSyncTime = 0;
+        const lastSentEye = [0, 0, 0];
+
+        // Cache de nodos DOM para mantener 60 FPS sin hacer querySelectorAll cada frame
+        const cachedSlides = [];
+        const cachedNavButtons = [];
+
+        function createSoftCarShadowTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(128, 128, 16, 128, 128, 118);
+            grad.addColorStop(0, 'rgba(0, 0, 0, 0.72)');
+            grad.addColorStop(0.55, 'rgba(0, 0, 0, 0.28)');
+            grad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 256, 256);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // Calcula la altura y anchura envolvente real de la carrocería del Porsche 911 (992)
+        // calibrada a la escala exacta del modelo 3D en pantalla (+Z = frente, -Z = cola)
+        function getPorsche911HullEnvelope(z) {
+            if (z > 15.0 || z < -13.8) {
+                return { active: false, topY: -99, bottomY: -2.2, halfWidth: 0 };
+            }
+
+            const bottomY = -2.2;
+            let topY = -1.2;
+
+            if (z > 13.4) {
+                // Onda de presión frontal (bow wave) justo delante de la defensa delantera (z = 15.0 a 13.4)
+                const t = (15.0 - z) / 1.6;
+                topY = -1.25 + t * 0.90;
+            } else if (z > 5.4) {
+                // Parachoques frontal, faros y ascenso por el capó delantero (z = 13.4 a 5.4)
+                const t = (13.4 - z) / 8.0;
+                topY = -0.35 + Math.pow(t, 0.76) * 2.15;
+            } else if (z > 0.5) {
+                // Parabrisas inclinado ascendiendo hasta superar la cumbre del techo blanco (z = 5.4 a 0.5)
+                const t = (5.4 - z) / 4.9;
+                topY = 1.80 + Math.sin(t * Math.PI * 0.5) * 2.45;
+            } else if (z > -8.6) {
+                // Caída de techo icónica Flyline 911 y medallón trasero (z = 0.5 a -8.6)
+                const t = (0.5 - z) / 9.1;
+                topY = 4.25 - Math.pow(t, 1.18) * 2.30;
+            } else {
+                // Spoiler trasero activo (PAA) y salida sobre las luces traseras (z = -8.6 a -13.8)
+                const t = (-8.6 - z) / 5.2;
+                topY = 1.95 - t * 1.00;
+            }
+
+            // Anchura real abarcando carrocería y pasos de rueda traseros Carrera S
+            let halfWidth = 4.85;
+            if (z < -1.0 && z > -10.5) {
+                halfWidth = 5.35;
+            } else if (z > 7.5) {
+                halfWidth = 4.85 * (1.0 - (z - 7.5) * 0.045);
+            }
+
+            return { active: true, topY, bottomY, halfWidth };
+        }
+
+        function resetAeroParticle(p, randomizeZ = false) {
+            p.baseX = (Math.random() - 0.5) * 8.6;
+            // Rango vertical calibrado desde la toma de aire frontal hasta por encima del techo
+            p.baseY = -1.15 + Math.random() * 5.4;
+            // Recorrido amplio desde delante de la defensa (+21.5) hasta detrás del spoiler (-21.5)
+            p.z = randomizeZ ? (21.5 - Math.random() * 43.0) : (16.2 + Math.random() * 5.5);
+            p.x = p.baseX;
+            p.y = p.baseY;
+
+            // Si nace en una coordenada Z sobre el carro al inicializar, colócala ya por encima de la carrocería
+            const initHull = getPorsche911HullEnvelope(p.z);
+            if (initHull.active) {
+                const layerOffset = 0.22 + Math.max(0, (p.baseY - (-1.15)) / 5.4) * 0.95;
+                p.y = Math.max(p.baseY, initHull.topY + layerOffset);
+            }
+
+            p.vx = 0;
+            p.vy = 0;
+            p.vz = -(19.5 + Math.random() * 6.5); // Dirección del viento: de frente (+Z) hacia atrás (-Z)
+            p.phase = Math.random() * Math.PI * 2;
+        }
+
+        function createAerodynamicWindParticles() {
+            // Geometría diminuta elongada en Z para percibir claramente la dirección de las líneas de flujo
+            const geometry = new THREE.IcosahedronGeometry(0.032, 0);
+            geometry.scale(0.85, 0.85, 3.8);
+
+            aeroParticleMaterial = new THREE.MeshBasicMaterial({
+                color: 0xe8f4ff,
+                transparent: true,
+                opacity: 0,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+
+            aeroParticleMesh = new THREE.InstancedMesh(geometry, aeroParticleMaterial, AERO_PARTICLE_COUNT);
+            aeroParticleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            aeroParticleMesh.frustumCulled = false;
+            aeroParticleMesh.visible = false;
+
+            const cLow = new THREE.Color(0xdbeafe);  // Blanco azulado tenue
+            const cHigh = new THREE.Color(0x38bdf8); // Azul aerodinámico al acelerar sobre el techo
+            const tempColor = new THREE.Color();
+
+            for (let i = 0; i < AERO_PARTICLE_COUNT; i++) {
+                const p = {
+                    baseX: 0, baseY: 0,
+                    x: 0, y: 0, z: 0,
+                    vx: 0, vy: 0, vz: -20,
+                    phase: 0
+                };
+                resetAeroParticle(p, true);
+                aeroParticlesData.push(p);
+
+                tempColor.lerpColors(cLow, cHigh, Math.random() * 0.65);
+                aeroParticleMesh.setColorAt(i, tempColor);
+            }
+
+            if (aeroParticleMesh.instanceColor) {
+                aeroParticleMesh.instanceColor.needsUpdate = true;
+            }
+
+            scene.add(aeroParticleMesh);
+        }
+
+        function updateAerodynamicWindParticles(dt, aeroWeight, elapsedTime) {
+            if (!aeroParticleMesh || !aeroParticleMaterial) return;
+
+            if (aeroWeight <= 0.01) {
+                aeroParticleMesh.visible = false;
+                return;
+            }
+
+            aeroParticleMesh.visible = true;
+            aeroParticleMaterial.opacity = aeroWeight * 0.82;
+
+            for (let i = 0; i < AERO_PARTICLE_COUNT; i++) {
+                const p = aeroParticlesData[i];
+
+                // Avance frontal del viento: desde el frente del Porsche (+Z) hacia la parte trasera (-Z)
+                p.z += p.vz * dt;
+
+                if (p.z < -21.5) {
+                    resetAeroParticle(p, false);
+                }
+
+                let targetX = p.baseX;
+                let targetY = p.baseY;
+                let speedStretch = 1.0;
+                let minAllowedY = -99;
+
+                // Interacción física con el volumen 3D real del Porsche 911
+                const hull = getPorsche911HullEnvelope(p.z);
+                if (hull.active) {
+                    const compression = 1.0 - Math.min(1.0, Math.abs(p.z) / 14.0);
+                    const layerOffset = 0.22 + Math.max(0, (p.baseY - (-1.15)) / 5.4) * 0.95;
+                    minAllowedY = hull.topY + layerOffset * 0.85;
+
+                    // En la caída trasera Flyline (z < 0.5) las líneas de corriente descienden siguiendo el techo
+                    if (p.z < 0.5) {
+                        targetY = hull.topY + layerOffset;
+                    } else {
+                        targetY = Math.max(p.baseY, hull.topY + layerOffset);
+                    }
+                    targetX = p.baseX * (1.0 + compression * 0.06);
+                    speedStretch = 1.45 + compression * 0.65; // Efecto Venturi sobre el techo
+                } else if (p.z < -13.8) {
+                    // Estela aerodinámica detrás del spoiler trasero y difusor
+                    const wakeDist = -13.8 - p.z;
+                    const wakeFactor = Math.min(1.0, wakeDist / 6.5);
+                    const layerOffset = 0.22 + Math.max(0, (p.baseY - (-1.15)) / 5.4) * 0.95;
+                    const spoilerExitY = 0.95 + layerOffset;
+                    targetY = THREE.MathUtils.lerp(spoilerExitY, p.baseY * 0.75, wakeFactor * 0.55)
+                        + Math.sin(elapsedTime * 7.0 + p.phase) * 0.22 * wakeFactor;
+                    targetX = p.baseX + Math.cos(elapsedTime * 5.5 + p.phase) * 0.18 * wakeFactor;
+                }
+
+                const prevX = p.x;
+                const prevY = p.y;
+
+                p.x += (targetX - p.x) * Math.min(1.0, dt * 14.0);
+                p.y += (targetY - p.y) * Math.min(1.0, dt * 14.0);
+
+                // Garantiza que ninguna partícula atraviese la silueta del carro
+                if (p.y < minAllowedY) {
+                    p.y = minAllowedY;
+                }
+
+                p.vx = (p.x - prevX) / Math.max(0.001, dt);
+                p.vy = (p.y - prevY) / Math.max(0.001, dt);
+
+                aeroDummy.position.set(p.x, p.y, p.z);
+                // Orienta cada micropartícula siguiendo el vector tangente real de la corriente (de frente a cola)
+                aeroDummy.lookAt(
+                    p.x + p.vx * 0.08,
+                    p.y + p.vy * 0.08,
+                    p.z + p.vz * 0.08
+                );
+                aeroDummy.scale.set(1.0, 1.0, speedStretch);
+                aeroDummy.updateMatrix();
+
+                aeroParticleMesh.setMatrixAt(i, aeroDummy.matrix);
+            }
+
+            aeroParticleMesh.instanceMatrix.needsUpdate = true;
+        }
+
+        function cacheDOMElements() {
+            CHAPTERS.forEach((_, idx) => {
+                const slide = document.getElementById(`chapter-${idx}`);
+                if (slide) {
+                    cachedSlides.push({
+                        el: slide,
+                        items: Array.from(slide.querySelectorAll('.scroll-rise-item'))
+                    });
+                }
+            });
+            document.querySelectorAll('[data-nav]').forEach((btn) => {
+                cachedNavButtons.push({
+                    el: btn,
+                    index: parseInt(btn.getAttribute('data-nav'), 10)
+                });
+            });
+        }
+
+        async function init() {
+            cacheDOMElements();
+
+            const container = document.getElementById('aero-particles-layer') || document.getElementById('webgl-container');
+            const loaderBar = document.getElementById('loader-bar');
+            const loaderPercent = document.getElementById('loader-percent');
+            const loaderStatus = document.getElementById('loader-status');
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 200);
+            camera.position.copy(currentCamPos);
+            camera.lookAt(currentCamTarget);
+
+            scene = new THREE.Scene();
+
+            // Renderer ultraligero a 60 FPS sin post-procesado pesado
+            renderer = new THREE.WebGLRenderer({
+                antialias: false,
+                alpha: true,
+                powerPreference: 'high-performance',
+                stencil: false,
+                depth: true
+            });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(0x000000, 0);
+            container.appendChild(renderer.domElement);
+
+            // Inicializa las micropartículas aerodinámicas para el capítulo 02
+            createAerodynamicWindParticles();
+
+            initSketchfabPorsche(loaderBar, loaderPercent, loaderStatus);
+            setupUIInteractions();
+            updateChaptersScrollTransition(0, true);
+
+            window.addEventListener('resize', onWindowResize, { passive: true });
+            renderer.setAnimationLoop(animate);
+        }
+
+        function initSketchfabPorsche(loaderBar, loaderPercent, loaderStatus) {
+            const iframe = document.getElementById('sketchfab-frame');
+            if (!iframe || typeof window.Sketchfab === 'undefined') {
+                setTimeout(hideLoaderScreen, 600);
+                return;
+            }
+
+            const client = new window.Sketchfab('1.12.1', iframe);
+
+            // Desactivamos inspector, vr, fullscreen y cualquier botón de interfaz de Sketchfab
+            client.init(SKETCHFAB_MODEL_UID, {
+                autostart: 1,
+                transparent: 1,
+                fps: 60,
+                navigation: 'orbit',
+                ui_infos: 0,
+                ui_controls: 0,
+                ui_general_controls: 0,
+                ui_inspector: 0,
+                ui_stop: 0,
+                ui_watermark: 0,
+                ui_watermark_link: 0,
+                ui_hint: 0,
+                ui_ar: 0,
+                ui_help: 0,
+                ui_settings: 0,
+                ui_vr: 0,
+                ui_fullscreen: 0,
+                ui_annotations: 0,
+                scrollwheel: 0,
+                double_click: 0,
+                success: function (api) {
+                    sketchfabApi = api;
+                    api.start();
+                    api.addEventListener('viewerready', function () {
+                        sketchfabReady = true;
+
+                        if (loaderBar) loaderBar.style.width = '100%';
+                        if (loaderPercent) loaderPercent.textContent = '100%';
+                        if (loaderStatus) loaderStatus.textContent = 'PORSCHE 911 LISTO';
+
+                        if (typeof api.setUserInteraction === 'function') {
+                            api.setUserInteraction(false);
+                        }
+
+                        // Aplica Blanco Carrara Metalizado al iniciar el modelo
+                        applyPorscheBodyColor(INITIAL_BODY_COLOR);
+
+                        api.getCameraLookAt(function (err, cam) {
+                            if (!err && cam && cam.target && cam.position) {
+                                modelCenter = cam.target;
+                                const dx = cam.position[0] - cam.target[0];
+                                const dy = cam.position[1] - cam.target[1];
+                                const dz = cam.position[2] - cam.target[2];
+                                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                                if (dist > 0.01) {
+                                    modelRadius = dist * PORSCHE_ZOOM_SCALE;
+                                }
+                                syncPorscheCamera(true);
+                            }
+                        });
+
+                        setTimeout(hideLoaderScreen, 250);
+                    });
+                },
+                error: function () {
+                    hideLoaderScreen();
+                }
+            });
+        }
+
+        function hideLoaderScreen() {
+            const loaderScreen = document.getElementById('loader-screen');
+            if (loaderScreen && loaderScreen.style.opacity !== '0') {
+                loaderScreen.style.opacity = '0';
+                loaderScreen.style.pointerEvents = 'none';
+                setTimeout(() => loaderScreen.remove(), 450);
+            }
+        }
+
+        function syncPorscheCamera(force = false) {
+            if (!sketchfabReady || !sketchfabApi) return;
+
+            const now = performance.now();
+            if (!force && now - lastCamSyncTime < 16) return;
+
+            const baseDistance = 26.0;
+            const scale = modelRadius / baseDistance;
+
+            // Rotación ortogonal derecha (det = +1) que alinea los ejes de Three.js con el modelo de Sketchfab:
+            // +Z (Three.js) -> +X (Sketchfab: Frente / capó del Porsche 911)
+            // +X (Three.js) -> +Y (Sketchfab: Lateral izquierdo / -X = Lateral derecho cerrado)
+            // +Y (Three.js) -> +Z (Sketchfab: Eje vertical / techo)
+            const eye = [
+                modelCenter[0] + currentCamPos.z * scale,
+                modelCenter[1] + currentCamPos.x * scale,
+                modelCenter[2] + (currentCamPos.y - 2.0) * scale
+            ];
+
+            const target = [
+                modelCenter[0] + currentCamTarget.z * scale,
+                modelCenter[1] + currentCamTarget.x * scale,
+                modelCenter[2] + (currentCamTarget.y - 2.0) * scale
+            ];
+
+            const delta = Math.hypot(
+                eye[0] - lastSentEye[0],
+                eye[1] - lastSentEye[1],
+                eye[2] - lastSentEye[2]
+            );
+
+            if (force || delta > 0.0015) {
+                lastSentEye[0] = eye[0];
+                lastSentEye[1] = eye[1];
+                lastSentEye[2] = eye[2];
+                lastCamSyncTime = now;
+                sketchfabApi.setCameraLookAt(eye, target, 0);
+            }
+        }
+
+        function applyPorscheBodyColor(hexString) {
+            if (!sketchfabReady || !sketchfabApi) return;
+
+            const c = new THREE.Color(hexString);
+            sketchfabApi.getMaterialList(function (err, materials) {
+                if (err || !materials) return;
+
+                materials.forEach((mat) => {
+                    const name = (mat.name || '').toLowerCase();
+                    const isBodyPaint =
+                        name.includes('paint') ||
+                        name.includes('body') ||
+                        name.includes('carpaint') ||
+                        name.includes('exterior') ||
+                        name.includes('porsche') ||
+                        name.includes('coat') ||
+                        name.includes('shell');
+
+                    const isExcluded =
+                        name.includes('glass') ||
+                        name.includes('window') ||
+                        name.includes('tire') ||
+                        name.includes('tyre') ||
+                        name.includes('rubber') ||
+                        name.includes('chrome') ||
+                        name.includes('light') ||
+                        name.includes('brake') ||
+                        name.includes('interior') ||
+                        name.includes('leather');
+
+                    if (isBodyPaint && !isExcluded && mat.channels) {
+                        if (mat.channels.AlbedoPBR) {
+                            mat.channels.AlbedoPBR.color = [c.r, c.g, c.b];
+                            mat.channels.AlbedoPBR.enable = true;
+                        }
+                        if (mat.channels.DiffusePBR) {
+                            mat.channels.DiffusePBR.color = [c.r, c.g, c.b];
+                            mat.channels.DiffusePBR.enable = true;
+                        }
+                        if (mat.channels.DiffuseColor) {
+                            mat.channels.DiffuseColor.color = [c.r, c.g, c.b];
+                            mat.channels.DiffuseColor.enable = true;
+                        }
+                        sketchfabApi.setMaterial(mat);
+                    }
+                });
+            });
+        }
+
+        function updateChaptersScrollTransition(progress, force = false) {
+            if (!force && Math.abs(progress - lastRenderedProgress) < 0.0005) return;
+            lastRenderedProgress = progress;
+
+            for (let idx = 0; idx < cachedSlides.length; idx++) {
+                const slideObj = cachedSlides[idx];
+                const offset = idx - progress;
+                const absOffset = Math.abs(offset);
+
+                if (absOffset > 1.2) {
+                    slideObj.el.style.opacity = '0';
+                    slideObj.el.classList.remove('is-active');
+                    continue;
+                }
+
+                const translateY = offset * 135;
+                const opacity = Math.max(0, 1 - absOffset * 1.4);
+
+                slideObj.el.style.transform = `translate3d(0, ${translateY.toFixed(1)}px, 0)`;
+                slideObj.el.style.opacity = opacity.toFixed(3);
+
+                if (absOffset < 0.45) {
+                    slideObj.el.classList.add('is-active');
+                } else {
+                    slideObj.el.classList.remove('is-active');
+                }
+
+                const items = slideObj.items;
+                for (let i = 0; i < items.length; i++) {
+                    const staggerY = offset * (20 + i * 14);
+                    items[i].style.transform = `translate3d(0, ${staggerY.toFixed(1)}px, 0)`;
+                }
+            }
+
+            const nearestChapter = Math.round(progress);
+            if (nearestChapter !== lastActiveNavIndex) {
+                lastActiveNavIndex = nearestChapter;
+                for (let i = 0; i < cachedNavButtons.length; i++) {
+                    const navItem = cachedNavButtons[i];
+                    navItem.el.classList.toggle('active', navItem.index === nearestChapter);
+                }
+            }
+        }
+
+        function goToChapter(index) {
+            const total = CHAPTERS.length;
+            const wrapped = ((index % total) + total) % total;
+            targetScrollProgress = wrapped;
+        }
+        window.goToChapter = goToChapter;
+
+        function setupUIInteractions() {
+            const btnPrev = document.getElementById('btn-prev');
+            if (btnPrev) btnPrev.addEventListener('click', () => goToChapter(Math.round(targetScrollProgress) - 1));
+
+            const btnNext = document.getElementById('btn-next');
+            if (btnNext) btnNext.addEventListener('click', () => goToChapter(Math.round(targetScrollProgress) + 1));
+
+            const btnHome = document.getElementById('btn-home');
+            if (btnHome) btnHome.addEventListener('click', () => goToChapter(0));
+
+            // Botones de cambio de perspectiva del túnel de viento
+            document.querySelectorAll('[data-aero-view]').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const viewKey = btn.getAttribute('data-aero-view');
+                    setAeroView(viewKey);
+                });
+            });
+
+            const swatches = document.querySelectorAll('.porsche-swatch');
+            swatches.forEach((swatch) => {
+                swatch.addEventListener('click', () => {
+                    swatches.forEach((s) => s.classList.remove('active'));
+                    swatch.classList.add('active');
+
+                    const hex = swatch.getAttribute('data-preset');
+                    const name = swatch.getAttribute('data-name');
+                    const category = swatch.getAttribute('data-category');
+
+                    applyPorscheBodyColor(hex);
+
+                    const nameEl = document.getElementById('active-color-name');
+                    if (nameEl) nameEl.textContent = name;
+
+                    const catEl = document.getElementById('active-color-category');
+                    if (catEl) catEl.textContent = category;
+
+                    const previewEl = document.getElementById('active-color-preview');
+                    if (previewEl) previewEl.style.backgroundColor = hex;
+                });
+            });
+
+            window.addEventListener('wheel', (e) => {
+                const step = e.deltaY * 0.0014;
+                targetScrollProgress = THREE.MathUtils.clamp(
+                    targetScrollProgress + step,
+                    0,
+                    CHAPTERS.length - 1
+                );
+            }, { passive: true });
+
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    targetScrollProgress = THREE.MathUtils.clamp(
+                        Math.round(targetScrollProgress) + 1,
+                        0,
+                        CHAPTERS.length - 1
+                    );
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    targetScrollProgress = THREE.MathUtils.clamp(
+                        Math.round(targetScrollProgress) - 1,
+                        0,
+                        CHAPTERS.length - 1
+                    );
+                }
+            });
+        }
+
+        function onWindowResize() {
+            if (!camera || !renderer) return;
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.render(scene, camera);
+        }
+
+        let lastFrameTime = performance.now();
+
+        function animate() {
+            const now = performance.now();
+            const dt = Math.min(0.05, Math.max(0.001, (now - lastFrameTime) * 0.001));
+            lastFrameTime = now;
+
+            const diff = targetScrollProgress - currentScrollProgress;
+
+            if (Math.abs(diff) > 0.0002) {
+                currentScrollProgress += diff * 0.085;
+            }
+
+            // Peso de visibilidad de las partículas de viento en el Capítulo 02 (índice 1: Aerodinámica)
+            const aeroDistance = Math.abs(currentScrollProgress - 1.0);
+            const aeroWeight = Math.max(0, 1.0 - aeroDistance * 1.65);
+            const isAeroSectionActive = aeroWeight > 0.01;
+
+            if (isAeroSectionActive || (aeroParticleMesh && aeroParticleMesh.visible)) {
+                updateAerodynamicWindParticles(dt, aeroWeight, now * 0.001);
+            }
+
+            // En la sección 05 (Pintura), el carro gira lentamente hacia el lado derecho
+            const isPaintSectionActive = currentScrollProgress > 3.05;
+            if (isPaintSectionActive) {
+                paintOrbitAngle += 0.0038;
+                CHAPTERS[4].camPos.set(
+                    Math.cos(paintOrbitAngle) * PAINT_ORBIT_RADIUS,
+                    PAINT_ORBIT_HEIGHT,
+                    Math.sin(paintOrbitAngle) * PAINT_ORBIT_RADIUS
+                );
+                CHAPTERS[4].camTarget.copy(
+                    computeRightShiftedTarget(CHAPTERS[4].camPos, PAINT_CAR_CENTER, PAINT_RIGHT_SHIFT)
+                );
+            }
+
+            const lowIdx = Math.floor(currentScrollProgress);
+            const highIdx = Math.min(CHAPTERS.length - 1, lowIdx + 1);
+            const fraction = currentScrollProgress - lowIdx;
+
+            const chA = CHAPTERS[lowIdx];
+            const chB = CHAPTERS[highIdx];
+
+            desiredCamPos.lerpVectors(chA.camPos, chB.camPos, fraction);
+            desiredCamTarget.lerpVectors(chA.camTarget, chB.camTarget, fraction);
+
+            const camMoveDist =
+                currentCamPos.distanceToSquared(desiredCamPos) +
+                currentCamTarget.distanceToSquared(desiredCamTarget);
+
+            if (isAeroSectionActive || isPaintSectionActive || Math.abs(diff) > 0.0002 || camMoveDist > 0.0002) {
+                currentCamPos.lerp(desiredCamPos, 0.1);
+                currentCamTarget.lerp(desiredCamTarget, 0.1);
+
+                camera.position.copy(currentCamPos);
+                camera.lookAt(currentCamTarget);
+
+                syncPorscheCamera(false);
+                updateChaptersScrollTransition(currentScrollProgress, false);
+                renderer.render(scene, camera);
+            }
+        }
+
+        setTimeout(hideLoaderScreen, 3200);
+
+        init().catch((err) => {
+            console.error('Error al inicializar la escena:', err);
+            hideLoaderScreen();
+        });
+    </script>
+</body>
+</html>
